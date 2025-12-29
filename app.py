@@ -1,43 +1,22 @@
 import streamlit as st
+from data.database import FAMILY_COLLECTION
+
+from data.add_member import render_add_member_form
+from data.edit_member import render_edit_member_form
+from data.search_member import render_search_interface
 
 from handlers.graph_handlers import render_graph
 from handlers.request_handlers import get_relatives
 
 st.title("🔍 Bahlolpur Ancestry Database")
 
-with st.form(key='search_form'):
-    name_input = st.text_input("Enter Name", placeholder="e.g. Satyam Anand")
-    submit_button = st.form_submit_button(label='Search')
+tab_view, tab_add, tab_edit = st.tabs(["🔍 Search Tree", "➕ Add Member", "✏️ Edit Details"])
 
-# 2. Trigger logic when button is clicked OR name is provided
-if submit_button and name_input:
-    results = get_relatives(name_input)
+with tab_view:
+    render_search_interface(get_relatives, render_graph)
 
-    if results:
-        # ... (Same string preparation logic as above) ...
-        spouse_str = results['spouse']['name'] if results['spouse'] else "None"
-        children_str = ", ".join([c['name'] for c in results['children']]) or "None"
-        parents_str = ", ".join([p['name'] for p in results['parents']]) or "None"
-        grandparents_str = ", ".join([gp['name'] for gp in results['grandparents']]) or "None"
+with tab_add:
+    render_add_member_form(FAMILY_COLLECTION)
 
-        # Create a markdown table manually
-        markdown_table = f"""
-        | Relationship | Names |
-        | :--- | :--- |
-        | **❤️ Spouse** | {spouse_str} |
-        | **👶 Children** | {children_str} |
-        | **👪 Parents** | {parents_str} |
-        | **👴👵 Grandparents** | {grandparents_str} |
-        """
-
-        st.markdown("### Family Details")
-        st.markdown(markdown_table)
-        st.markdown("---")
-            # --- Display Graph ---
-        st.subheader("Visualization")
-        st.graphviz_chart(render_graph(results))
-
-    else:
-        st.error("Person not found in database.")
-elif submit_button and not name_input:
-    st.warning("Please enter a name first.")
+with tab_edit:
+    render_edit_member_form(FAMILY_COLLECTION)
