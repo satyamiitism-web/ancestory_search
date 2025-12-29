@@ -1,6 +1,11 @@
 from pymongo import MongoClient
+from dotenv import load_dotenv
+import os
+load_dotenv('.env')
 
-client = MongoClient('mongodb+srv://satyamiitism_db_user:mOOMP9nvSyXNrPuC@cluster0.swxtgho.mongodb.net/')
+MONGO_URI = os.getenv("MONGO_URI")
+
+client = MongoClient(MONGO_URI)
 filter={}
 
 db_name = "bahlolpur_ancestory"
