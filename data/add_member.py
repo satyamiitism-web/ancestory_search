@@ -25,7 +25,15 @@ def render_add_member_form(collection):
         with p2:
             mother = st.text_input("Mother's Name", placeholder="e.g. Nilu Sharma")
 
-        # Row 3: Contact & Work (New Section)
+        # Row 3: Parent-in-laws (Always Visible)
+        st.markdown("### Parent-in-laws")
+        pil1, pil2 = st.columns(2)
+        with pil1:
+            father_in_law = st.text_input("Father-in-law's Name")
+        with pil2:
+            mother_in_law = st.text_input("Mother-in-law's Name")
+
+        # Row 4: Contact & Work
         st.markdown("### Contact & Work")
         w1, w2 = st.columns(2)
         with w1:
@@ -35,6 +43,7 @@ def render_add_member_form(collection):
 
         submitted = st.form_submit_button("💾 Save to Database", use_container_width=True)
 
+    # --- Handle Submission ---
     if submitted:
         if not name:
             st.error("❌ Name is mandatory!")
@@ -44,23 +53,24 @@ def render_add_member_form(collection):
         slug = name.lower().strip()
         parents = [p.strip() for p in [father, mother] if p.strip()]
         
+        # Handle In-laws (Always capture if entered)
+        parents_in_law = [p.strip() for p in [father_in_law, mother_in_law] if p.strip()]
+
         new_doc = {
             "slug": slug,
             "name": name.strip(),
             "gender": gender,
             "spouse": spouse.strip(),
             "parents": parents,
-            "phone": phone.strip(),  # Added phone
-            "work": work.strip()     # Added work
+            "parents_in_law": parents_in_law, # Added field
+            "phone": phone.strip(),
+            "work": work.strip()
         }
 
         # Insert into MongoDB
         try:
             collection.insert_one(new_doc)
             st.success(f"✅ **{name}** added successfully!")
-            
-            # Optional: Clear cache if you are caching data
-            # st.cache_data.clear() 
             
         except DuplicateKeyError:
             st.error(f"⚠️ **{name}** already exists in the family tree.")

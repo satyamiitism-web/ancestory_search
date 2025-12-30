@@ -1,14 +1,14 @@
 import streamlit as st
 import time
 from pymongo.errors import PyMongoError
-
+from streamlit.runtime.secrets import StreamlitSecretNotFoundError
 
 def check_password():
     """Returns `True` if the user had the correct password."""
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] == st.secrets.get("PASSWORD", "admin123"):
+        if st.session_state["password"] == st.secrets.get("PASSWORD"):
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store the password
         else:
@@ -32,7 +32,7 @@ def check_password():
 def render_edit_member_form(collection):
     """
     Renders the Edit/Manage Member interface.
-    Includes simple password authentication.
+    Includes Parent-in-law support (always visible in edit mode).
     """
     
     # --- 0. AUTHENTICATION CHECK ---
@@ -89,7 +89,6 @@ def render_edit_member_form(collection):
             # --- VIEW MODE (Read Only) ---
             st.subheader(f"📄 {person['name']}")
             
-            # Display details nicely
             col_a, col_b = st.columns(2)
             with col_a:
                 st.markdown(f"**Gender:** {person.get('gender', 'N/A')}")
@@ -100,6 +99,12 @@ def render_edit_member_form(collection):
                 parents_str = ", ".join(parents) if parents else "Unknown"
                 st.markdown(f"**Parents:** {parents_str}")
                 st.markdown(f"**Work:** {person.get('work', '—')}")
+
+            # View Parent-in-laws if they exist
+            in_laws = person.get('parents_in_law', [])
+            if in_laws:
+                st.markdown("---")
+                st.markdown(f"**Parents-in-Law:** {', '.join(in_laws)}")
 
             st.divider()
             
@@ -167,6 +172,18 @@ def render_edit_member_form(collection):
                 with pc2:
                     new_mother = st.text_input("Mother", value=p2_val)
 
+                # Parent-in-laws (Always Visible in Form)
+                st.markdown("### Parent-in-laws")
+                curr_in_laws = person.get('parents_in_law', [])
+                pil1_val = curr_in_laws[0] if len(curr_in_laws) > 0 else ""
+                pil2_val = curr_in_laws[1] if len(curr_in_laws) > 1 else ""
+
+                pil_c1, pil_c2 = st.columns(2)
+                with pil_c1:
+                    new_father_in_law = st.text_input("Father-in-law", value=pil1_val)
+                with pil_c2:
+                    new_mother_in_law = st.text_input("Mother-in-law", value=pil2_val)
+
                 # Contact & Work Section
                 st.markdown("### Contact & Work")
                 w1, w2 = st.columns(2)
@@ -193,12 +210,15 @@ def render_edit_member_form(collection):
                 try:
                     # Prepare Data
                     updated_parents = [p.strip() for p in [new_father, new_mother] if p.strip()]
+                    updated_in_laws = [p.strip() for p in [new_father_in_law, new_mother_in_law] if p.strip()]
+
                     update_payload = {
                         "slug": new_name.lower().strip(),
                         "name": new_name.strip(),
                         "gender": new_gender,
                         "spouse": new_spouse.strip(),
                         "parents": updated_parents,
+                        "parents_in_law": updated_in_laws, # Always save if present
                         "phone": new_phone.strip(),
                         "work": new_work.strip()
                     }
