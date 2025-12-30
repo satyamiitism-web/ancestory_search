@@ -1,5 +1,7 @@
 import streamlit as st
 from pymongo.errors import DuplicateKeyError
+from datetime import datetime, timezone  # <--- IMPORT ADDED
+
 
 def render_add_member_form(collection):
     """
@@ -52,9 +54,10 @@ def render_add_member_form(collection):
         # Prepare Data
         slug = name.lower().strip()
         parents = [p.strip() for p in [father, mother] if p.strip()]
-        
-        # Handle In-laws (Always capture if entered)
         parents_in_law = [p.strip() for p in [father_in_law, mother_in_law] if p.strip()]
+
+        # --- NEW: Get Current Timestamp (UTC) ---
+        current_timestamp = datetime.now(timezone.utc)
 
         new_doc = {
             "slug": slug,
@@ -62,9 +65,12 @@ def render_add_member_form(collection):
             "gender": gender,
             "spouse": spouse.strip(),
             "parents": parents,
-            "parents_in_law": parents_in_law, # Added field
+            "parents_in_law": parents_in_law, 
             "phone": phone.strip(),
-            "work": work.strip()
+            "work": work.strip(),
+            # --- NEW: Add Timestamps ---
+            "created_at": current_timestamp,
+            "updated_at": current_timestamp
         }
 
         # Insert into MongoDB

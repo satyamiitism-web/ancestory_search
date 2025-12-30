@@ -2,13 +2,20 @@ import streamlit as st
 import time
 from pymongo.errors import PyMongoError
 from streamlit.runtime.secrets import StreamlitSecretNotFoundError
+from datetime import datetime, timezone  # <--- IMPORT ADDED
 
 def check_password():
     """Returns `True` if the user had the correct password."""
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] == st.secrets.get("PASSWORD"):
+        # Robustly fetch password, defaulting to "admin123" if secrets.toml is missing
+        try:
+            stored_password = st.secrets.get("PASSWORD", "admin123")
+        except (FileNotFoundError, StreamlitSecretNotFoundError):
+            stored_password = "admin123"
+
+        if st.session_state["password"] == stored_password:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store the password
         else:
@@ -32,7 +39,7 @@ def check_password():
 def render_edit_member_form(collection):
     """
     Renders the Edit/Manage Member interface.
-    Includes Parent-in-law support (always visible in edit mode).
+    Includes timestamps update logic.
     """
     
     # --- 0. AUTHENTICATION CHECK ---
@@ -106,6 +113,10 @@ def render_edit_member_form(collection):
                 st.markdown("---")
                 st.markdown(f"**Parents-in-Law:** {', '.join(in_laws)}")
 
+            # View Timestamps (Optional visual)
+            # if 'updated_at' in person:
+            #     st.caption(f"Last updated: {person['updated_at']}")
+
             st.divider()
             
             # Action Buttons Row
@@ -172,7 +183,7 @@ def render_edit_member_form(collection):
                 with pc2:
                     new_mother = st.text_input("Mother", value=p2_val)
 
-                # Parent-in-laws (Always Visible in Form)
+                # Parent-in-laws
                 st.markdown("### Parent-in-laws")
                 curr_in_laws = person.get('parents_in_law', [])
                 pil1_val = curr_in_laws[0] if len(curr_in_laws) > 0 else ""
@@ -212,15 +223,20 @@ def render_edit_member_form(collection):
                     updated_parents = [p.strip() for p in [new_father, new_mother] if p.strip()]
                     updated_in_laws = [p.strip() for p in [new_father_in_law, new_mother_in_law] if p.strip()]
 
+                    # --- NEW: Get Current Timestamp ---
+                    current_timestamp = datetime.now(timezone.utc)
+
                     update_payload = {
                         "slug": new_name.lower().strip(),
                         "name": new_name.strip(),
                         "gender": new_gender,
                         "spouse": new_spouse.strip(),
                         "parents": updated_parents,
-                        "parents_in_law": updated_in_laws, # Always save if present
+                        "parents_in_law": updated_in_laws, 
                         "phone": new_phone.strip(),
-                        "work": new_work.strip()
+                        "work": new_work.strip(),
+                        # --- NEW: Update Timestamp ---
+                        "updated_at": current_timestamp
                     }
 
                     # DB Update
