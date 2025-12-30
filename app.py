@@ -10,23 +10,32 @@ from data.db_view import render_database_view
 from handlers.graph_handlers import render_graph
 from handlers.request_handlers import get_relatives
 
-st.title("🔍 Bahlolpur Ancestry Database")
+st.title("🔍 बहलोलपुर वंशावली")
 
-tab_view, tab_add, tab_edit, tab_data = st.tabs([
-    "🔍 Search Tree",
-    "➕ Add Member",
-    "✏️ Edit Details",
-    "📋 Database View"
-])
+selection = st.segmented_control(
+    "Mode",
+    options=["search", "add", "edit", "data"],
+    format_func=lambda x: {
+        "search": "🔍 Search Tree",
+        "add": "➕ Add Member",
+        "edit": "✏️ Edit Details",
+        "data": "📋 Database View"
+    }[x],
+    selection_mode="single",
+    default="search"
+)
 
-with tab_view:
+st.divider()
+
+if selection == "search":
     render_search_interface(get_relatives, render_graph)
 
-with tab_add:
+elif selection == "add":
     render_add_member_form(FAMILY_COLLECTION)
 
-with tab_edit:
+elif selection == "edit":
     render_edit_member_form(FAMILY_COLLECTION)
 
-with tab_data:
+elif selection == "data":
+    st.subheader("Full Database Registry")
     render_database_view(FAMILY_COLLECTION)
