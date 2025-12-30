@@ -3,12 +3,42 @@ import time
 from pymongo.errors import PyMongoError
 
 
+def check_password():
+    """Returns `True` if the user had the correct password."""
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] == st.secrets.get("PASSWORD", "admin123"):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Don't store the password
+        else:
+            st.session_state["password_correct"] = False
+
+    # Return True if the user is already authenticated
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # Show input for password
+    st.text_input(
+        "Enter Admin Password", type="password", on_change=password_entered, key="password"
+    )
+    
+    if "password_correct" in st.session_state:
+        st.error("😕 Password incorrect")
+        
+    return False
+
+
 def render_edit_member_form(collection):
     """
     Renders the Edit/Manage Member interface.
-    Includes auto-reset when leaving the tab and delete functionality.
+    Includes simple password authentication.
     """
     
+    # --- 0. AUTHENTICATION CHECK ---
+    if not check_password():
+        st.stop()  # Stop execution if not authenticated
+
     # --- 1. AUTO-RESET LOGIC ---
     c_head, c_reset = st.columns([4, 1])
     with c_head:
@@ -19,7 +49,6 @@ def render_edit_member_form(collection):
                 del st.session_state['current_person']
             st.session_state['is_editing'] = False
             st.rerun()
-
 
     # --- 2. SEARCH SECTION ---
     with st.container():
@@ -33,7 +62,6 @@ def render_edit_member_form(collection):
             )
         with search_col2:
             search_btn = st.button("🔍 Search", use_container_width=True, key="edit_search_btn")
-
 
     if search_btn:
         if not search_query:
@@ -51,7 +79,6 @@ def render_edit_member_form(collection):
                 if 'current_person' in st.session_state:
                     del st.session_state['current_person']
 
-
     # --- 3. DISPLAY / EDIT SECTION ---
     if 'current_person' in st.session_state:
         person = st.session_state['current_person']
@@ -67,15 +94,12 @@ def render_edit_member_form(collection):
             with col_a:
                 st.markdown(f"**Gender:** {person.get('gender', 'N/A')}")
                 st.markdown(f"**Spouse:** {person.get('spouse', 'None')}")
-                # ADDED: Phone display
                 st.markdown(f"**Phone:** {person.get('phone', '—')}")
             with col_b:
                 parents = person.get('parents', [])
                 parents_str = ", ".join(parents) if parents else "Unknown"
                 st.markdown(f"**Parents:** {parents_str}")
-                # ADDED: Work display
                 st.markdown(f"**Work:** {person.get('work', '—')}")
-
 
             st.divider()
             
@@ -92,7 +116,6 @@ def render_edit_member_form(collection):
                 if st.button("🗑️ Delete", type="primary", use_container_width=True):
                     st.session_state['confirm_delete'] = True
                     st.rerun()
-
 
             # --- DELETE CONFIRMATION DIALOG ---
             if st.session_state.get('confirm_delete', False):
@@ -114,7 +137,6 @@ def render_edit_member_form(collection):
                     if st.button("❌ No, Cancel", use_container_width=True):
                         st.session_state['confirm_delete'] = False
                         st.rerun()
-
 
         else:
             # --- EDIT MODE (Form) ---
@@ -145,7 +167,7 @@ def render_edit_member_form(collection):
                 with pc2:
                     new_mother = st.text_input("Mother", value=p2_val)
 
-                # ADDED: Contact & Work Section
+                # Contact & Work Section
                 st.markdown("### Contact & Work")
                 w1, w2 = st.columns(2)
                 with w1:
@@ -162,12 +184,10 @@ def render_edit_member_form(collection):
                 with btn_col2:
                     cancel_edit = st.form_submit_button("❌ Cancel Edit", type="secondary", use_container_width=True)
 
-
             # --- Handle Form Logic ---
             if cancel_edit:
                 st.session_state['is_editing'] = False
                 st.rerun()
-
 
             if submit_update:
                 try:
@@ -179,10 +199,9 @@ def render_edit_member_form(collection):
                         "gender": new_gender,
                         "spouse": new_spouse.strip(),
                         "parents": updated_parents,
-                        "phone": new_phone.strip(),  # ADDED: phone field
-                        "work": new_work.strip()     # ADDED: work field
+                        "phone": new_phone.strip(),
+                        "work": new_work.strip()
                     }
-
 
                     # DB Update
                     collection.update_one({"_id": person['_id']}, {"$set": update_payload})
