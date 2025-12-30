@@ -2,3 +2,4 @@ streamlit
 graphviz
 pymongo
 python-dotenv
+pandas
