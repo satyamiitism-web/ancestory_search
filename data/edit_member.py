@@ -2,6 +2,7 @@ import streamlit as st
 import time
 from pymongo.errors import PyMongoError
 
+
 def render_edit_member_form(collection):
     """
     Renders the Edit/Manage Member interface.
@@ -9,12 +10,6 @@ def render_edit_member_form(collection):
     """
     
     # --- 1. AUTO-RESET LOGIC ---
-    # We use a unique key to track if we are in this specific tab context.
-    # If the user navigates away and back, we might want to clear old data.
-    # Note: Streamlit re-runs the whole script, so 'tab switching' is just
-    # parts of the script not running. We can check if 'current_person' exists.
-    
-    # Optional: Add a 'Clear' button at the top to manually reset
     c_head, c_reset = st.columns([4, 1])
     with c_head:
         st.header("👤 Manage Member Details")
@@ -24,6 +19,7 @@ def render_edit_member_form(collection):
                 del st.session_state['current_person']
             st.session_state['is_editing'] = False
             st.rerun()
+
 
     # --- 2. SEARCH SECTION ---
     with st.container():
@@ -38,6 +34,7 @@ def render_edit_member_form(collection):
         with search_col2:
             search_btn = st.button("🔍 Search", use_container_width=True, key="edit_search_btn")
 
+
     if search_btn:
         if not search_query:
             st.toast("⚠️ Please enter a name first.")
@@ -51,9 +48,9 @@ def render_edit_member_form(collection):
                 st.toast(f"✅ Found {person['name']}")
             else:
                 st.error(f"❌ Could not find anyone named '{search_query}'")
-                # Clear state if search fails
                 if 'current_person' in st.session_state:
                     del st.session_state['current_person']
+
 
     # --- 3. DISPLAY / EDIT SECTION ---
     if 'current_person' in st.session_state:
@@ -70,10 +67,15 @@ def render_edit_member_form(collection):
             with col_a:
                 st.markdown(f"**Gender:** {person.get('gender', 'N/A')}")
                 st.markdown(f"**Spouse:** {person.get('spouse', 'None')}")
+                # ADDED: Phone display
+                st.markdown(f"**Phone:** {person.get('phone', '—')}")
             with col_b:
                 parents = person.get('parents', [])
                 parents_str = ", ".join(parents) if parents else "Unknown"
                 st.markdown(f"**Parents:** {parents_str}")
+                # ADDED: Work display
+                st.markdown(f"**Work:** {person.get('work', '—')}")
+
 
             st.divider()
             
@@ -87,10 +89,10 @@ def render_edit_member_form(collection):
             
             with action_col2:
                 # DELETE BUTTON
-                # We use a popover or just a session state toggle for confirmation
                 if st.button("🗑️ Delete", type="primary", use_container_width=True):
                     st.session_state['confirm_delete'] = True
                     st.rerun()
+
 
             # --- DELETE CONFIRMATION DIALOG ---
             if st.session_state.get('confirm_delete', False):
@@ -113,16 +115,17 @@ def render_edit_member_form(collection):
                         st.session_state['confirm_delete'] = False
                         st.rerun()
 
+
         else:
             # --- EDIT MODE (Form) ---
             st.subheader(f"✏️ Editing: {person['name']}")
             
             with st.form("update_form"):
+                # Basic Info
                 new_name = st.text_input("Full Name", value=person['name'])
                 
                 c1, c2 = st.columns(2)
                 with c1:
-                    # Safe index finding
                     g_opts = ["M", "F", "Other"]
                     curr_g = person.get('gender', 'M')
                     idx = g_opts.index(curr_g) if curr_g in g_opts else 0
@@ -130,6 +133,7 @@ def render_edit_member_form(collection):
                 with c2:
                     new_spouse = st.text_input("Spouse Name", value=person.get('spouse', ''))
 
+                # Parents
                 st.markdown("### Parents")
                 curr_parents = person.get('parents', [])
                 p1_val = curr_parents[0] if len(curr_parents) > 0 else ""
@@ -141,6 +145,14 @@ def render_edit_member_form(collection):
                 with pc2:
                     new_mother = st.text_input("Mother", value=p2_val)
 
+                # ADDED: Contact & Work Section
+                st.markdown("### Contact & Work")
+                w1, w2 = st.columns(2)
+                with w1:
+                    new_phone = st.text_input("Phone Number", value=person.get('phone', ''))
+                with w2:
+                    new_work = st.text_input("Work Details", value=person.get('work', ''))
+
                 st.divider()
                 
                 # Footer Buttons
@@ -150,10 +162,12 @@ def render_edit_member_form(collection):
                 with btn_col2:
                     cancel_edit = st.form_submit_button("❌ Cancel Edit", type="secondary", use_container_width=True)
 
+
             # --- Handle Form Logic ---
             if cancel_edit:
                 st.session_state['is_editing'] = False
                 st.rerun()
+
 
             if submit_update:
                 try:
@@ -164,8 +178,11 @@ def render_edit_member_form(collection):
                         "name": new_name.strip(),
                         "gender": new_gender,
                         "spouse": new_spouse.strip(),
-                        "parents": updated_parents
+                        "parents": updated_parents,
+                        "phone": new_phone.strip(),  # ADDED: phone field
+                        "work": new_work.strip()     # ADDED: work field
                     }
+
 
                     # DB Update
                     collection.update_one({"_id": person['_id']}, {"$set": update_payload})
