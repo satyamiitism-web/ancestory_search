@@ -12,3 +12,4 @@ db_name = "bahlolpur_ancestory"
 
 FAMILY_COLLECTION  = client[db_name]["members"]
 USERS_COLLECTION = client[db_name]["admin_members"]
+EVENTS_COLLECTION = client[db_name]["events"]

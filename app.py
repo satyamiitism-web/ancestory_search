@@ -2,12 +2,14 @@ import streamlit as st
 
 st.set_page_config(page_title="बहलोलपुर वंशावली")
 
-from data.database import FAMILY_COLLECTION, USERS_COLLECTION
+from data.database import FAMILY_COLLECTION, USERS_COLLECTION, EVENTS_COLLECTION
 import pandas as pd
 
 from data.add_member import render_add_member_form
 from data.edit_member import render_edit_member_form
 from data.view_details import render_search_interface
+from data.events import render_events_page
+from data.history_page import render_history_markdown
 from data.db_view import render_database_view
 from data.view_tree import render_tree_view
 from data.lineage_info import render_lineage_sidebar
@@ -32,11 +34,13 @@ st.title("🔍 बहलोलपुर वंशावली")
 # 3. Navigation
 selection = st.segmented_control(
     "Mode",
-    options=["search", "tree", "admin"],
+    options=["history", "search", "tree", "events", "admin"],
     format_func=lambda x: {
-        "search": "🔍 Search Member",
-        "tree": "🌳 View Full Tree",
-        "admin": "🔐 Admin Panel" if st.session_state['logged_in'] else "🔐 Admin Login"
+        "history": "ℹ️ history",
+        "search": "🔍 Search",
+        "tree": "🌳 Tree",
+        "events": "📅 Events",
+        "admin": "🔐 Admin Panel" if st.session_state['logged_in'] else "🔐 Admin"
     }[x],
     selection_mode="single",
     default=st.session_state['nav_mode'],
@@ -47,11 +51,17 @@ selection = st.segmented_control(
 st.divider()
 
 # --- PUBLIC SECTIONS ---
-if selection == "search":
+if selection == "history":
+    render_history_markdown()
+
+elif selection == "search":
     render_search_interface(get_relatives)
 
 elif selection == "tree":
     render_tree_view(FAMILY_COLLECTION, None)
+
+elif selection == "events":
+    render_events_page(EVENTS_COLLECTION)
 
 # --- ADMIN SECTION ---
 elif selection == "admin":
