@@ -3,7 +3,61 @@ import streamlit as st
 from data.database import EVENTS_COLLECTION
 
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, time
+
+def render_add_event_form():
+    """
+    Renders a form to add new events to the MongoDB 'events' collection.
+    """
+    st.subheader("📅 Add New Event")
+    
+    with st.form("new_event_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            title = st.text_input("Event Title", placeholder="e.g. Holi Milan Samaroh")
+            location = st.text_input("Location", placeholder="e.g. Community Hall, Bahlolpur")
+            
+        with col2:
+            event_date = st.date_input("Event Date", min_value=datetime.today())
+            event_time = st.time_input("Time (Optional)", value=time(9, 0)) # Default 9:00 AM
+
+        description = st.text_area("Description / Details", placeholder="Enter details about the event...")
+        
+        submitted = st.form_submit_button("Save Event", type="primary")
+        
+        if submitted:
+            if not title or not location:
+                st.error("⚠️ Title and Location are required!")
+            else:
+                try:
+                    # 1. Combine Date and Time into a single datetime object
+                    # This is CRITICAL for your "upcoming" logic to work correctly
+                    full_datetime = datetime.combine(event_date, event_time)
+                    current_user = st.session_state.get("user_name").title()
+                    
+                    # 2. Create the document object
+                    new_event = {
+                        "title": title.strip(),
+                        "date": full_datetime, # Stored as ISODate in Mongo
+                        "location": location.strip(),
+                        "description": description.strip(),
+                        "created_at": datetime.now(),
+                        "created_by": current_user
+                    }
+                    
+                    # 3. Insert into Database
+                    EVENTS_COLLECTION.insert_one(new_event)
+                    
+                    # 4. Success Feedback
+                    st.success(f"✅ Event '{title}' added successfully!")
+                    
+                    # Optional: Rerun to update any sidebar/lists immediately
+                    # st.rerun() 
+                    
+                except Exception as e:
+                    st.error(f"❌ Error adding event: {e}")
+
 
 def render_events_page(events_collection):
     """Renders a full-page timeline view of upcoming events."""

@@ -8,7 +8,7 @@ import pandas as pd
 from data.add_member import render_add_member_form
 from data.edit_member import render_edit_member_form
 from data.view_details import render_search_interface
-from data.events import render_events_page
+from data.events import render_events_page, render_add_event_form
 from data.history_page import render_history_markdown
 from data.db_view import render_database_view
 from data.view_tree import render_tree_view
@@ -77,19 +77,22 @@ elif selection == "admin":
 
         admin_tab = st.radio(
             "Manage Database:",
-            options=["Add New Member", "Edit Details", "View Full Data"],
+            options=["Add New Member", "Edit Details", "Add Event", "View Full Data"],
             horizontal=True,
             label_visibility="collapsed"
         )
-        
+
         st.markdown("---")
 
         if admin_tab == "Add New Member":
             render_add_member_form(FAMILY_COLLECTION)
-            
+
         elif admin_tab == "Edit Details":
             render_edit_member_form(FAMILY_COLLECTION)
-            
+
         elif admin_tab == "View Full Data":
             st.subheader("Full Database Registry")
             render_database_view(FAMILY_COLLECTION)
+
+        elif admin_tab == "Add Event":
+            render_add_event_form()
