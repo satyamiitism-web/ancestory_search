@@ -52,7 +52,8 @@ def _display_family_results(results):
     # NEW: Metadata Row (Gender | Phone | Work)
     m1, m2, m3 = st.columns(3)
     with m1:
-        st.caption(f"**Gender:** {gender}")
+        gender_icon = "👨" if gender == "M" else "👩" 
+        st.caption(f"{gender_icon} **Gender:** {gender}")
     with m2:
         st.markdown(f"📞 **Phone:** {phone}")
     with m3:
