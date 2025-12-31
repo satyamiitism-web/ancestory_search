@@ -1,2 +1,6 @@
 *__pycache__*
 *.streamlit
+*lib
+*.devcontainer
+family_tree_graph.html
+focused_tree.html
