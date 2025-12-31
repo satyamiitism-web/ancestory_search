@@ -63,49 +63,71 @@ def render_focused_tree(data, center_name):
     dot.attr(nodesep='0.6', ranksep='0.8')
     
     # 2. Add Nodes & Handle Spouses Grouping
-    # We track which nodes we've already added to avoid duplicates
     added_nodes = set()
-
-    # A. Process Spouses First (Force them to same rank)
-    # We iterate through the map. Note: map might have A->B and B->A.
     processed_pairs = set()
     
+    # A. Process Spouses
     for p1, p2 in spouses_map.items():
         if p1 in relevant_nodes and p2 in relevant_nodes:
             pair = tuple(sorted((p1, p2)))
             if pair not in processed_pairs:
-                # Create a subgraph for this pair to force same rank
                 with dot.subgraph() as s:
                     s.attr(rank='same')
-                    
-                    # Add P1
+                    # P1
                     fill = '#FFD700' if p1 == center_node else '#E6F3FF'
                     s.node(p1, p1, shape='box', style='filled', fillcolor=fill, color='#2B7CE9')
                     added_nodes.add(p1)
-                    
-                    # Add P2
+                    # P2
                     fill = '#FFD700' if p2 == center_node else '#E6F3FF'
                     s.node(p2, p2, shape='box', style='filled', fillcolor=fill, color='#2B7CE9')
                     added_nodes.add(p2)
                     
-                    # Invisible edge to force ordering inside the rank (optional)
                     s.edge(p1, p2, style='invis') 
                 
-                # Draw the visible spouse connection
                 dot.edge(p1, p2, style='dashed', dir='none', color='#FF8888', constraint='false')
-                
                 processed_pairs.add(pair)
 
-    # B. Add Remaining Nodes (Single people without displayed spouses)
+    # B. Add Remaining Nodes
     for node in relevant_nodes:
         if node not in added_nodes:
             fill = '#FFD700' if node == center_node else '#E6F3FF'
             dot.node(node, node, shape='box', style='filled', fillcolor=fill, color='#2B7CE9')
             added_nodes.add(node)
 
-    # 3. Add Edges (Parent -> Child)
-    for parent, child in G.edges():
-        if parent in relevant_nodes and child in relevant_nodes:
-            dot.edge(parent, child, color='#555555')
+
+    # --- 3. Add Edges (Father -> Child Only) ---
+    
+    # Create a quick lookup for gender: { 'Name': 'M', ... }
+    gender_map = {p.get('name'): p.get('gender', 'M') for p in data if p.get('name')}
+
+    # Iterate through every node in the graph to find its parents
+    for child in relevant_nodes:
+        # --- CRITICAL FIX START ---
+        # If a spouse was added to relevant_nodes but has no own record/edges, 
+        # they won't be in G. We must skip them to prevent the NetworkXError.
+        if child not in G:
+            continue
+        # --- CRITICAL FIX END ---
+
+        # Get all parents (predecessors) for this child from the graph G
+        parents = [p for p in G.predecessors(child) if p in relevant_nodes]
+        
+        if not parents:
+            continue
+            
+        # Logic: Select which parent to draw the line from
+        father_node = None
+        
+        # Priority 1: Find a male parent
+        fathers = [p for p in parents if gender_map.get(p) == 'M']
+        
+        if fathers:
+            father_node = fathers[0] # Use the father
+        else:
+            # Priority 2: Fallback to the first parent found
+            father_node = parents[0]
+            
+        # Draw exactly ONE edge per child
+        dot.edge(father_node, child, color='#555555')
 
     return dot

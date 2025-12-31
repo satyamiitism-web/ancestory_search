@@ -58,6 +58,9 @@ def render_add_member_form(collection):
 
         # --- NEW: Get Current Timestamp (UTC) ---
         current_timestamp = datetime.now(timezone.utc)
+        current_user = st.session_state.get("user_name").title()
+
+        print(f"session_state_data: {st.session_state}")
 
         new_doc = {
             "slug": slug,
@@ -70,7 +73,8 @@ def render_add_member_form(collection):
             "work": work.strip(),
             # --- NEW: Add Timestamps ---
             "created_at": current_timestamp,
-            "updated_at": current_timestamp
+            "updated_at": current_timestamp,
+            "updated_by": current_user
         }
 
         # Insert into MongoDB

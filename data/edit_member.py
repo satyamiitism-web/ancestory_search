@@ -184,6 +184,7 @@ def render_edit_member_form(collection):
 
                     # --- NEW: Get Current Timestamp ---
                     current_timestamp = datetime.now(timezone.utc)
+                    current_user = st.session_state.get("user_name").title()
 
                     update_payload = {
                         "slug": new_name.lower().strip(),
@@ -194,7 +195,8 @@ def render_edit_member_form(collection):
                         "parents_in_law": updated_in_laws, 
                         "phone": new_phone.strip(),
                         "work": new_work.strip(),
-                        "updated_at": current_timestamp
+                        "updated_at": current_timestamp,
+                        "updated_by": current_user
                     }
 
                     # DB Update

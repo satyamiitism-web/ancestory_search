@@ -9,7 +9,6 @@ client = MongoClient(MONGO_URI)
 filter={}
 
 db_name = "bahlolpur_ancestory"
-col_name = "family_members"
 
-FAMILY_COLLECTION  = client[db_name][col_name]
-USERS_COLLECTION = client[db_name]["users"]
+FAMILY_COLLECTION  = client[db_name]["members"]
+USERS_COLLECTION = client[db_name]["admin_members"]
