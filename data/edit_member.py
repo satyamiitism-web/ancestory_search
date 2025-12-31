@@ -1,40 +1,7 @@
 import streamlit as st
 import time
 from pymongo.errors import PyMongoError
-from streamlit.runtime.secrets import StreamlitSecretNotFoundError
-from datetime import datetime, timezone  # <--- IMPORT ADDED
-
-def check_password():
-    """Returns `True` if the user had the correct password."""
-
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        # Robustly fetch password, defaulting to "admin123" if secrets.toml is missing
-        try:
-            stored_password = st.secrets.get("PASSWORD", "admin123")
-        except (FileNotFoundError, StreamlitSecretNotFoundError):
-            stored_password = "admin123"
-
-        if st.session_state["password"] == stored_password:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Don't store the password
-        else:
-            st.session_state["password_correct"] = False
-
-    # Return True if the user is already authenticated
-    if st.session_state.get("password_correct", False):
-        return True
-
-    # Show input for password
-    st.text_input(
-        "Enter Admin Password", type="password", on_change=password_entered, key="password"
-    )
-    
-    if "password_correct" in st.session_state:
-        st.error("😕 Password incorrect")
-        
-    return False
-
+from datetime import datetime, timezone
 
 def render_edit_member_form(collection):
     """
@@ -42,10 +9,6 @@ def render_edit_member_form(collection):
     Includes timestamps update logic.
     """
     
-    # --- 0. AUTHENTICATION CHECK ---
-    if not check_password():
-        st.stop()  # Stop execution if not authenticated
-
     # --- 1. AUTO-RESET LOGIC ---
     c_head, c_reset = st.columns([4, 1])
     with c_head:
@@ -112,10 +75,6 @@ def render_edit_member_form(collection):
             if in_laws:
                 st.markdown("---")
                 st.markdown(f"**Parents-in-Law:** {', '.join(in_laws)}")
-
-            # View Timestamps (Optional visual)
-            # if 'updated_at' in person:
-            #     st.caption(f"Last updated: {person['updated_at']}")
 
             st.divider()
             
@@ -235,7 +194,6 @@ def render_edit_member_form(collection):
                         "parents_in_law": updated_in_laws, 
                         "phone": new_phone.strip(),
                         "work": new_work.strip(),
-                        # --- NEW: Update Timestamp ---
                         "updated_at": current_timestamp
                     }
 

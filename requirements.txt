@@ -3,3 +3,4 @@ graphviz
 pymongo
 python-dotenv
 pandas
+networkx
