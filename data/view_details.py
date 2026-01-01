@@ -4,29 +4,38 @@ from data.database import FAMILY_COLLECTION
 def render_search_interface(get_relatives_func):
     """
     Renders search with context based on 'Association' type.
+    Uses SLUG to ensure the correct duplicate member is shown.
     """
     st.header("📇 View Member Details")
 
-    # --- 1. Fetch Data ---
-    # We fetch 'association' along with relatives
+    # --- 1. Fetch Data (Must include 'slug') ---
     raw_members = list(FAMILY_COLLECTION.find({}, {
         "name": 1, 
+        "slug": 1,  # <--- CRITICAL: Fetch Unique ID
         "association": 1,
         "parents": 1, 
         "spouse": 1,
-        "father_in_law": 1, # Fetch if your DB stores this directly
+        "parents_in_law": 1,
+        "gender": 1,
         "_id": 0
     }).sort("name", 1))
 
     # --- 2. Build Labels ---
-    name_map = {}
+    # Map: "Display Label" -> "Unique Slug"
+    label_to_slug_map = {}
     display_options = []
 
     for m in raw_members:
-        name = m.get('name', 'Unknown')
-        assoc = str(m.get('association', '')).lower().strip() # Normalize string
+        name = m.get('name')
+        slug = m.get('slug') # Unique ID
         
-        # Helpers to safely get list/string items
+        # If no slug exists (old data), fall back to name, but warn internally
+        if not slug: 
+            slug = name 
+
+        assoc = str(m.get('association', '')).lower().strip()
+        
+        # Helpers
         def get_first(field):
             val = m.get(field)
             if isinstance(val, list) and val: return val[0]
@@ -35,45 +44,41 @@ def render_search_interface(get_relatives_func):
 
         spouse_name = get_first('spouse')
         father_name = get_first('parents')
+        father_in_law_name = get_first("parents_in_law")
         
-        # --- LOGIC START ---
         relation_suffix = ""
 
-        # Case 1: Daughter-in-Law (Bahu) -> Show Husband (w/o)
+        # --- LOGIC START (Same as your logic) ---
         if "daughter-in-law" in assoc:
-            if spouse_name:
+            if father_in_law_name:
+                 relation_suffix = f"(d/o-in-law of {father_in_law_name})"
+            else:
                 relation_suffix = f"(w/o {spouse_name})"
-            elif father_name: # Fallback if spouse missing but Father-in-law (parent field) exists
-                 relation_suffix = f"(d/o-in-law of {father_name})"
 
-        # Case 2: Son-in-Law (Damad) -> Show Father-in-Law (s/o-in-law of)
-        # Note: Usually 'parents' field for a Damad might store the Father-in-law
         elif "son-in-law" in assoc:
-            if father_name: 
-                relation_suffix = f"(s/o-in-law of {father_name})"
+            if father_in_law_name: 
+                relation_suffix = f"(s/o-in-law of {father_in_law_name})"
             elif spouse_name:
                 relation_suffix = f"(h/o {spouse_name})"
 
-        # Case 3: Son/Daughter (Beta/Beti) -> Show Father (s/o or d/o)
-        # This covers "son", "daughter", "grandson", "granddaughter" usually
         else:
             if father_name:
-                # Check gender or association text to decide s/o vs d/o
                 if "daughter" in assoc or "beti" in assoc or "female" in str(m.get('gender','')).lower():
                     prefix = "d/o"
                 else:
                     prefix = "s/o"
                 relation_suffix = f"({prefix} {father_name})"
-
+            
             elif spouse_name:
                  prefix = "w/o" if "female" in str(m.get('gender','')).lower() else "h/o"
                  relation_suffix = f"({prefix} {spouse_name})"
-
         # --- LOGIC END ---
 
         full_label = f"{name} {relation_suffix}".strip()
+        
+        # Add to list and map
         display_options.append(full_label)
-        name_map[full_label] = name
+        label_to_slug_map[full_label] = slug  # Store SLUG here, not name
 
     # --- 3. Render Widget ---
     selected_label_list = st.multiselect(
@@ -87,13 +92,18 @@ def render_search_interface(get_relatives_func):
     # --- 4. Handle Selection ---
     if selected_label_list:
         label_selected = selected_label_list[0]
-        real_name_to_search = name_map[label_selected]
+        
+        # Retrieve the SLUG
+        selected_slug = label_to_slug_map[label_selected]
 
-        with st.spinner(f"Fetching details for '{real_name_to_search}'..."):
-            results = get_relatives_func(real_name_to_search)
+        with st.spinner(f"Fetching details..."):
+            results = get_relatives_func(selected_slug)
 
         if results:
             _display_family_results(results)
+        else:
+            st.error(f"Could not find details for ID: {selected_slug}")
+
 
 def _display_family_results(results):
     """Internal helper to display the results nicely."""

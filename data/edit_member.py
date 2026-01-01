@@ -6,50 +6,99 @@ from datetime import datetime, timezone
 def render_edit_member_form(collection):
     """
     Renders the Edit/Manage Member interface.
-    Includes Association field and Timestamps.
+    Features:
+    - Search by name (Exact match preferred)
+    - Disambiguation: Handles multiple people with the same name.
+    - Edit Form: Includes Association, Relationship, and Timestamps.
     """
     
-    # --- 1. AUTO-RESET LOGIC ---
+    # --- 1. HEADER & RESET LOGIC ---
     c_head, c_reset = st.columns([4, 1])
     with c_head:
         st.header("👤 Manage Member Details")
     with c_reset:
         if st.button("🔄 Reset", type="tertiary", help="Clear current selection"):
-            if 'current_person' in st.session_state:
-                del st.session_state['current_person']
-            st.session_state['is_editing'] = False
+            # Clear all related session states
+            keys_to_clear = ['current_person', 'search_candidates', 'is_editing', 'confirm_delete']
+            for k in keys_to_clear:
+                if k in st.session_state:
+                    del st.session_state[k]
             st.rerun()
 
     # --- 2. SEARCH SECTION ---
-    with st.container():
-        search_col1, search_col2 = st.columns([3, 1])
-        with search_col1:
-            search_query = st.text_input(
-                "Find Person", 
-                placeholder="Enter name to edit/delete...", 
-                label_visibility="collapsed",
-                key="edit_search_box"
-            )
-        with search_col2:
-            search_btn = st.button("🔍 Search", use_container_width=True, key="edit_search_btn")
+    # Only show search if we haven't selected a person yet
+    if 'current_person' not in st.session_state and 'search_candidates' not in st.session_state:
+        with st.container():
+            search_col1, search_col2 = st.columns([3, 1])
+            with search_col1:
+                search_query = st.text_input(
+                    "Find Person", 
+                    placeholder="Enter name (e.g. Satyam Anand)...", 
+                    label_visibility="collapsed",
+                    key="edit_search_box"
+                )
+            with search_col2:
+                search_btn = st.button("🔍 Search", use_container_width=True, key="edit_search_btn")
 
-    if search_btn:
-        if not search_query:
-            st.toast("⚠️ Please enter a name first.")
-        else:
-            slug = search_query.lower().strip()
-            person = collection.find_one({"slug": slug})
+        # Handle Search Click
+        if search_btn and search_query:
+            query_str = search_query.strip()
+            # Regex for case-insensitive exact match anchor
+            candidates = list(collection.find({"name": {"$regex": f"^{query_str}$", "$options": "i"}}))
 
-            if person:
-                st.session_state['current_person'] = person
+            if not candidates:
+                st.error(f"❌ No record found for '{query_str}'")
+            
+            elif len(candidates) == 1:
+                # EXACT MATCH -> Select directly
+                st.session_state['current_person'] = candidates[0]
                 st.session_state['is_editing'] = False
-                st.toast(f"✅ Found {person['name']}")
+                st.toast(f"✅ Found {candidates[0]['name']}")
+                st.rerun()
+                
             else:
-                st.error(f"❌ Could not find anyone named '{search_query}'")
-                if 'current_person' in st.session_state:
-                    del st.session_state['current_person']
+                # MULTIPLE MATCHES -> Ask user
+                st.session_state['search_candidates'] = candidates
+                st.rerun()
 
-    # --- 3. DISPLAY / EDIT SECTION ---
+    # --- 3. DISAMBIGUATION (If multiple results found) ---
+    if 'search_candidates' in st.session_state and 'current_person' not in st.session_state:
+        st.warning(f"⚠️ Found {len(st.session_state['search_candidates'])} people with that name.")
+        
+        candidates = st.session_state['search_candidates']
+        options_map = {}
+        display_options = []
+        
+        for p in candidates:
+            # Build a helpful label: "Name (s/o Father) | Spouse: X"
+            parents = p.get('parents', [])
+            father = parents[0] if parents else "Unknown"
+            spouse = p.get('spouse', 'N/A')
+            assoc = p.get('association', 'N/A')
+            
+            label = f"{p['name']} (s/o {father}) | Spouse: {spouse} | {assoc}"
+            display_options.append(label)
+            options_map[label] = p
+
+        selected_label = st.selectbox(
+            "Please select the correct person to edit:", 
+            options=display_options,
+            key="disambiguation_select"
+        )
+        
+        c_confirm, c_cancel = st.columns([1, 1])
+        with c_confirm:
+            if st.button("✅ Confirm Selection", type="primary", use_container_width=True):
+                st.session_state['current_person'] = options_map[selected_label]
+                del st.session_state['search_candidates'] # Cleanup
+                st.session_state['is_editing'] = False
+                st.rerun()
+        with c_cancel:
+            if st.button("❌ Cancel", use_container_width=True):
+                del st.session_state['search_candidates']
+                st.rerun()
+
+    # --- 4. DISPLAY / EDIT SECTION ---
     if 'current_person' in st.session_state:
         person = st.session_state['current_person']
         st.divider()
@@ -58,13 +107,13 @@ def render_edit_member_form(collection):
         if not st.session_state.get('is_editing', False):
             # --- VIEW MODE (Read Only) ---
             st.subheader(f"📄 {person['name']}")
+            st.caption(f"ID: {person.get('slug', 'N/A')}") # Debug info
             
             col_a, col_b = st.columns(2)
             with col_a:
                 st.markdown(f"**Gender:** {person.get('gender', 'N/A')}")
                 st.markdown(f"**Spouse:** {person.get('spouse', 'None')}")
                 st.markdown(f"**Phone:** {person.get('phone', '—')}")
-                # NEW: Show Association
                 st.markdown(f"**Association:** {person.get('association', '—')}")
                 
             with col_b:
@@ -73,7 +122,6 @@ def render_edit_member_form(collection):
                 st.markdown(f"**Parents:** {parents_str}")
                 st.markdown(f"**Work:** {person.get('work', '—')}")
 
-            # View Parent-in-laws if they exist
             in_laws = person.get('parents_in_law', [])
             if in_laws:
                 st.markdown("---")
@@ -81,38 +129,35 @@ def render_edit_member_form(collection):
 
             st.divider()
             
-            # Action Buttons Row
-            action_col1, action_col2, action_col3 = st.columns([2, 2, 4])
-            
+            # Action Buttons
+            action_col1, action_col2 = st.columns([1, 1])
             with action_col1:
                 if st.button("✏️ Edit Details", use_container_width=True):
                     st.session_state['is_editing'] = True
                     st.rerun()
             
             with action_col2:
-                # DELETE BUTTON
                 if st.button("🗑️ Delete", type="primary", use_container_width=True):
                     st.session_state['confirm_delete'] = True
                     st.rerun()
 
-            # --- DELETE CONFIRMATION DIALOG ---
+            # DELETE CONFIRMATION
             if st.session_state.get('confirm_delete', False):
-                st.warning(f"⚠️ Are you sure you want to permanently delete **{person['name']}**?")
+                st.error(f"⚠️ Are you sure you want to delete **{person['name']}**?")
                 d_col1, d_col2 = st.columns(2)
                 with d_col1:
-                    if st.button("✅ Yes, Delete", type="primary", use_container_width=True):
+                    if st.button("✅ YES, DELETE", type="primary", use_container_width=True):
                         try:
                             collection.delete_one({"_id": person['_id']})
-                            st.success(f"🗑️ Deleted **{person['name']}**")
-                            # Cleanup State
+                            st.success(f"Deleted {person['name']}")
                             del st.session_state['current_person']
                             del st.session_state['confirm_delete']
-                            time.sleep(1.5)
+                            time.sleep(1)
                             st.rerun()
                         except PyMongoError as e:
-                            st.error(f"Delete Failed: {e}")
+                            st.error(f"Error: {e}")
                 with d_col2:
-                    if st.button("❌ No, Cancel", use_container_width=True):
+                    if st.button("❌ NO, Cancel", use_container_width=True):
                         st.session_state['confirm_delete'] = False
                         st.rerun()
 
@@ -157,32 +202,23 @@ def render_edit_member_form(collection):
                 with pil_c2:
                     new_mother_in_law = st.text_input("Mother-in-law", value=pil2_val)
 
-                # --- NEW: ASSOCIATION FIELD ---
+                # Relationship / Association
                 st.markdown("### Relationship & Work")
-                
-                # Pre-define common family associations for consistent data
-                assoc_options = ["son", "daughter", "daughter-in-law", "son-in-law"]
-                
-                # Get current value
+                assoc_options = ["son", "daughter", "daughter-in-law", "son-in-law", "wife", "husband", "other"]
                 curr_assoc = person.get('association', 'son')
                 
-                # Find index or default to 0 (Son)
-                # We do a loose match or exact match
-                assoc_idx = 0
-                if curr_assoc in assoc_options:
-                    assoc_idx = assoc_options.index(curr_assoc)
-                else:
-                    # If existing value is not in our list, append it temporarily so it shows up
+                # Logic to handle custom associations not in list
+                if curr_assoc not in assoc_options:
                     assoc_options.append(curr_assoc)
-                    assoc_idx = len(assoc_options) - 1
+                
+                assoc_idx = assoc_options.index(curr_assoc) if curr_assoc in assoc_options else 0
 
                 w1, w2 = st.columns(2)
                 with w1:
-                    new_association = st.selectbox("Association (Relation Type)", options=assoc_options, index=assoc_idx)
+                    new_association = st.selectbox("Association", options=assoc_options, index=assoc_idx)
                 with w2:
                     new_phone = st.text_input("Phone Number", value=person.get('phone', ''))
                 
-                # Work Details
                 new_work = st.text_input("Work Details", value=person.get('work', ''))
 
                 st.divider()
@@ -201,15 +237,32 @@ def render_edit_member_form(collection):
 
             if submit_update:
                 try:
-                    # Prepare Data
+                    # 1. Prepare Data
                     updated_parents = [p.strip() for p in [new_father, new_mother] if p.strip()]
                     updated_in_laws = [p.strip() for p in [new_father_in_law, new_mother_in_law] if p.strip()]
+                    
+                    # 2. Slug Generation Logic (with Counter)
+                    base_slug = new_name.lower().strip().replace(" ", "-")
+                    final_slug = base_slug
+                    
+                    # Check if this slug is taken by SOMEONE ELSE
+                    # We look for a doc with this slug where _id is NOT the current person's _id
+                    collision = collection.find_one({"slug": final_slug, "_id": {"$ne": person['_id']}})
+                    
+                    counter = 1
+                    while collision:
+                        # Collision found! Append counter and try again
+                        final_slug = f"{base_slug}-{counter}"
+                        collision = collection.find_one({"slug": final_slug, "_id": {"$ne": person['_id']}})
+                        counter += 1
+                    
+                    # At this point, final_slug is unique to this person
 
                     current_timestamp = datetime.now(timezone.utc)
                     current_user = st.session_state.get("user_name", "Admin").title()
 
                     update_payload = {
-                        "slug": new_name.lower().strip(),
+                        "slug": final_slug,  # <--- Now safe to update!
                         "name": new_name.strip(),
                         "gender": new_gender,
                         "spouse": new_spouse.strip(),
@@ -217,19 +270,19 @@ def render_edit_member_form(collection):
                         "parents_in_law": updated_in_laws, 
                         "phone": new_phone.strip(),
                         "work": new_work.strip(),
-                        "association": new_association, # <--- NEW FIELD IN PAYLOAD
+                        "association": new_association,
                         "updated_at": current_timestamp,
                         "updated_by": current_user
                     }
 
-                    # DB Update
+                    # 3. DB Update
                     collection.update_one({"_id": person['_id']}, {"$set": update_payload})
                     
                     # Update local state
                     st.session_state['current_person'].update(update_payload)
                     st.session_state['is_editing'] = False 
                     
-                    st.success("✅ Details updated successfully!")
+                    st.success(f"✅ Details updated! (ID: {final_slug})")
                     time.sleep(1) 
                     st.rerun()
                     

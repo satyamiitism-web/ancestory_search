@@ -1,11 +1,13 @@
 import streamlit as st
+import random
+import time
 from pymongo.errors import DuplicateKeyError
-from datetime import datetime, timezone  # <--- IMPORT ADDED
-
+from datetime import datetime, timezone
 
 def render_add_member_form(collection):
     """
     Renders the form to add a new family member.
+    Handles duplicate names by creating unique IDs using an incremental counter logic.
     """
     st.header("📝 Add New Member")
     
@@ -29,7 +31,7 @@ def render_add_member_form(collection):
         with p2:
             mother = st.text_input("Mother's Name", placeholder="e.g. Nilu Sharma")
 
-        # Row 3: Parent-in-laws (Always Visible)
+        # Row 3: Parent-in-laws
         st.markdown("### Parent-in-laws")
         pil1, pil2 = st.columns(2)
         with pil1:
@@ -53,20 +55,33 @@ def render_add_member_form(collection):
             st.error("❌ Name is mandatory!")
             return
 
-        # Prepare Data
-        slug = name.lower().strip()
+        # 1. Clean Inputs
+        clean_name = name.strip()
+        clean_father = father.strip()
+        clean_spouse = spouse.strip()
+        
         parents = [p.strip() for p in [father, mother] if p.strip()]
         parents_in_law = [p.strip() for p in [father_in_law, mother_in_law] if p.strip()]
 
-        # --- NEW: Get Current Timestamp (UTC) ---
+        base_str = clean_name.lower().replace(" ", "-")
+
+        final_slug = base_str
+        counter = 1
+
+        # Loop until we find a slug that DOES NOT exist
+        while collection.find_one({"slug": final_slug}):
+            final_slug = f"{base_str}-{counter}"
+            counter += 1
+
+        # 4. Prepare Document
         current_timestamp = datetime.now(timezone.utc)
-        current_user = st.session_state.get("user_name").title()
+        current_user = st.session_state.get("user_name", "Admin").title()
 
         new_doc = {
-            "slug": slug,
-            "name": name.strip(),
+            "slug": final_slug,  # <--- Guaranteed Unique
+            "name": clean_name,
             "gender": gender,
-            "spouse": spouse.strip(),
+            "spouse": clean_spouse,
             "parents": parents,
             "parents_in_law": parents_in_law,
             "phone": phone.strip(),
@@ -77,12 +92,14 @@ def render_add_member_form(collection):
             "updated_by": current_user
         }
 
-        # Insert into MongoDB
+        # 5. Insert
         try:
             collection.insert_one(new_doc)
-            st.success(f"✅ **{name}** added successfully!")
+            st.success(f"✅ **{clean_name}** added successfully!")
+            st.caption(f"Unique ID generated: `{final_slug}`") 
             
         except DuplicateKeyError:
-            st.error(f"⚠️ **{name}** already exists in the family tree.")
+            # Should be impossible due to the while loop check
+            st.error(f"⚠️ A record for **{clean_name}** already exists (ID Collision).")
         except Exception as e:
             st.error(f"❌ Database Error: {e}")

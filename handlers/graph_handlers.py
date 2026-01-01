@@ -2,11 +2,8 @@ import graphviz
 import streamlit as st
 import networkx as nx
 
+
 def get_focused_subgraph(full_data, center_person_name):
-    # ... (This logic remains the SAME as before) ...
-    # It builds G, finds relevant_nodes, and spouses_map correctly.
-    
-    # --- RE-PASTING LOGIC FOR SAFETY ---
     G = nx.DiGraph()
     name_map = {p['name'].lower(): p['name'] for p in full_data if 'name' in p}
     center_name_key = center_person_name.lower().strip()
@@ -15,6 +12,9 @@ def get_focused_subgraph(full_data, center_person_name):
         return None, f"Person '{center_person_name}' not found."
     
     actual_center_name = name_map[center_name_key]
+    
+    # Build person lookup map
+    person_map = {p['name'].lower(): p for p in full_data if 'name' in p}
     
     for person in full_data:
         name = person.get('name')
@@ -41,93 +41,118 @@ def get_focused_subgraph(full_data, center_person_name):
                     spouses_map[name] = spouse
                     relevant_nodes.add(spouse)
                     
-        return relevant_nodes, actual_center_name, G, spouses_map
+        return relevant_nodes, actual_center_name, G, spouses_map, person_map
     except Exception as e:
         return None, str(e)
 
 
 def render_focused_tree(data, center_name):
     result = get_focused_subgraph(data, center_name)
-    if not result or len(result) == 2:
-        st.error(result[1] if result else "Unknown Error")
+    if not result or len(result) != 5:
         return None
         
-    relevant_nodes, center_node, G, spouses_map = result
+    relevant_nodes, center_node, G, spouses_map, person_map = result
 
-    # --- GRAPHVIZ DRAWING ---
+    # --- GRAPHVIZ SETUP ---
     dot = graphviz.Digraph(comment='Family Tree')
-    
-    # 1. Global Attributes
-    dot.attr(rankdir='TB')
-    dot.attr(splines='ortho') 
-    dot.attr(nodesep='0.6', ranksep='0.8')
-    
-    # 2. Add Nodes & Handle Spouses Grouping
-    added_nodes = set()
+    dot.attr(rankdir='TB', splines='ortho', nodesep='0.6', ranksep='0.8')
+    dot.attr('node', shape='plain', fontname='Sans-Serif') 
+
+    # --- HELPER: GET GENDER ---
+    def get_gender(name):
+        p = person_map.get(name.lower().strip(), {})
+        return p.get('gender', 'M') 
+
+    # --- HELPER: GET STYLE (Color & Tooltip) ---
+    def get_node_style(name):
+        person = person_map.get(name.lower().strip(), {})
+        assoc = person.get('association', '')
+        
+        # 1. Center Node: Gold
+        if name == center_node:
+            return '#FFD700', f"{name} (Focus)"
+            
+        # 2. In-Laws: Lavender Blush (Different from standard blue)
+        # Check if 'in-law' is in the association text (case-insensitive)
+        if assoc and 'in-law' in str(assoc).lower():
+            return '#FFF0F5', f"{name} ({assoc})"
+            
+        # 3. Direct/Blood: Alice Blue
+        tooltip = f"{name} ({assoc})" if assoc else name
+        return '#E6F3FF', tooltip
+
+    # --- RENDER NODES ---
     processed_pairs = set()
-    
-    # A. Process Spouses
+    added_nodes = set()
+    node_id_map = {}
+
+    # A. COUPLES
     for p1, p2 in spouses_map.items():
         if p1 in relevant_nodes and p2 in relevant_nodes:
-            pair = tuple(sorted((p1, p2)))
-            if pair not in processed_pairs:
-                with dot.subgraph() as s:
-                    s.attr(rank='same')
-                    # P1
-                    fill = '#FFD700' if p1 == center_node else '#E6F3FF'
-                    s.node(p1, p1, shape='box', style='filled', fillcolor=fill, color='#2B7CE9')
-                    added_nodes.add(p1)
-                    # P2
-                    fill = '#FFD700' if p2 == center_node else '#E6F3FF'
-                    s.node(p2, p2, shape='box', style='filled', fillcolor=fill, color='#2B7CE9')
-                    added_nodes.add(p2)
-                    
-                    s.edge(p1, p2, style='invis') 
+            pair_key = tuple(sorted((p1, p2)))
+            
+            if pair_key not in processed_pairs:
+                g1 = get_gender(p1)
+                g2 = get_gender(p2)
                 
-                dot.edge(p1, p2, style='dashed', dir='none', color='#FF8888', constraint='false')
-                processed_pairs.add(pair)
+                # Logic: Husband on Top
+                top_p, bottom_p = pair_key[0], pair_key[1]
+                if g1 == 'M' and g2 != 'M':
+                    top_p, bottom_p = p1, p2
+                elif g2 == 'M' and g1 != 'M':
+                    top_p, bottom_p = p2, p1
+                
+                # Get Styles for each person in the couple
+                bg_top, tip_top = get_node_style(top_p)
+                bg_btm, tip_btm = get_node_style(bottom_p)
 
-    # B. Add Remaining Nodes
+                # HTML Table Label with ALIGN="CENTER" and TOOLTIP
+                label = f"""<
+                <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" ROUNDED="TRUE">
+                  <TR><TD ALIGN="CENTER" VALIGN="MIDDLE" BGCOLOR="{bg_top}" PORT="top" TOOLTIP="{tip_top}">{top_p}</TD></TR>
+                  <TR><TD ALIGN="CENTER" VALIGN="MIDDLE" BGCOLOR="{bg_btm}" PORT="bottom" TOOLTIP="{tip_btm}">{bottom_p}</TD></TR>
+                </TABLE>>"""
+                
+                node_id = f"{pair_key[0]}_{pair_key[1]}"
+                dot.node(node_id, label=label)
+                
+                added_nodes.add(p1)
+                added_nodes.add(p2)
+                processed_pairs.add(pair_key)
+                node_id_map[p1] = node_id
+                node_id_map[p2] = node_id
+
+    # B. SINGLES
     for node in relevant_nodes:
         if node not in added_nodes:
-            fill = '#FFD700' if node == center_node else '#E6F3FF'
-            dot.node(node, node, shape='box', style='filled', fillcolor=fill, color='#2B7CE9')
+            bg_color, tooltip = get_node_style(node)
+            
+            label = f"""<
+            <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" ROUNDED="TRUE">
+              <TR><TD ALIGN="CENTER" VALIGN="MIDDLE" BGCOLOR="{bg_color}" PORT="center" TOOLTIP="{tooltip}">{node}</TD></TR>
+            </TABLE>>"""
+            
+            node_id = node.replace(" ", "_")
+            dot.node(node_id, label=label)
+            
             added_nodes.add(node)
+            node_id_map[node] = node_id
 
-
-    # --- 3. Add Edges (Father -> Child Only) ---
-    
-    # Create a quick lookup for gender: { 'Name': 'M', ... }
-    gender_map = {p.get('name'): p.get('gender', 'M') for p in data if p.get('name')}
-
-    # Iterate through every node in the graph to find its parents
+    # --- EDGES ---
+    added_edges = set()
     for child in relevant_nodes:
-        # --- CRITICAL FIX START ---
-        # If a spouse was added to relevant_nodes but has no own record/edges, 
-        # they won't be in G. We must skip them to prevent the NetworkXError.
-        if child not in G:
-            continue
-        # --- CRITICAL FIX END ---
-
-        # Get all parents (predecessors) for this child from the graph G
-        parents = [p for p in G.predecessors(child) if p in relevant_nodes]
+        if child not in G: continue
+        parents = list(G.predecessors(child))
+        if not parents: continue
         
-        if not parents:
-            continue
-            
-        # Logic: Select which parent to draw the line from
-        father_node = None
+        father = next((p for p in parents if get_gender(p) == 'M'), parents[0])
         
-        # Priority 1: Find a male parent
-        fathers = [p for p in parents if gender_map.get(p) == 'M']
+        u = node_id_map.get(father)
+        v = node_id_map.get(child)
         
-        if fathers:
-            father_node = fathers[0] # Use the father
-        else:
-            # Priority 2: Fallback to the first parent found
-            father_node = parents[0]
-            
-        # Draw exactly ONE edge per child
-        dot.edge(father_node, child, color='#555555')
+        if u and v and u != v:
+            if (u, v) not in added_edges:
+                dot.edge(u, v, color='#555555')
+                added_edges.add((u, v))
 
     return dot
