@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 def render_edit_member_form(collection):
     """
     Renders the Edit/Manage Member interface.
-    Includes timestamps update logic.
+    Includes Association field and Timestamps.
     """
     
     # --- 1. AUTO-RESET LOGIC ---
@@ -64,6 +64,9 @@ def render_edit_member_form(collection):
                 st.markdown(f"**Gender:** {person.get('gender', 'N/A')}")
                 st.markdown(f"**Spouse:** {person.get('spouse', 'None')}")
                 st.markdown(f"**Phone:** {person.get('phone', '—')}")
+                # NEW: Show Association
+                st.markdown(f"**Association:** {person.get('association', '—')}")
+                
             with col_b:
                 parents = person.get('parents', [])
                 parents_str = ", ".join(parents) if parents else "Unknown"
@@ -154,13 +157,33 @@ def render_edit_member_form(collection):
                 with pil_c2:
                     new_mother_in_law = st.text_input("Mother-in-law", value=pil2_val)
 
-                # Contact & Work Section
-                st.markdown("### Contact & Work")
+                # --- NEW: ASSOCIATION FIELD ---
+                st.markdown("### Relationship & Work")
+                
+                # Pre-define common family associations for consistent data
+                assoc_options = ["son", "daughter", "daughter-in-law", "son-in-law"]
+                
+                # Get current value
+                curr_assoc = person.get('association', 'son')
+                
+                # Find index or default to 0 (Son)
+                # We do a loose match or exact match
+                assoc_idx = 0
+                if curr_assoc in assoc_options:
+                    assoc_idx = assoc_options.index(curr_assoc)
+                else:
+                    # If existing value is not in our list, append it temporarily so it shows up
+                    assoc_options.append(curr_assoc)
+                    assoc_idx = len(assoc_options) - 1
+
                 w1, w2 = st.columns(2)
                 with w1:
-                    new_phone = st.text_input("Phone Number", value=person.get('phone', ''))
+                    new_association = st.selectbox("Association (Relation Type)", options=assoc_options, index=assoc_idx)
                 with w2:
-                    new_work = st.text_input("Work Details", value=person.get('work', ''))
+                    new_phone = st.text_input("Phone Number", value=person.get('phone', ''))
+                
+                # Work Details
+                new_work = st.text_input("Work Details", value=person.get('work', ''))
 
                 st.divider()
                 
@@ -182,9 +205,8 @@ def render_edit_member_form(collection):
                     updated_parents = [p.strip() for p in [new_father, new_mother] if p.strip()]
                     updated_in_laws = [p.strip() for p in [new_father_in_law, new_mother_in_law] if p.strip()]
 
-                    # --- NEW: Get Current Timestamp ---
                     current_timestamp = datetime.now(timezone.utc)
-                    current_user = st.session_state.get("user_name").title()
+                    current_user = st.session_state.get("user_name", "Admin").title()
 
                     update_payload = {
                         "slug": new_name.lower().strip(),
@@ -195,6 +217,7 @@ def render_edit_member_form(collection):
                         "parents_in_law": updated_in_laws, 
                         "phone": new_phone.strip(),
                         "work": new_work.strip(),
+                        "association": new_association, # <--- NEW FIELD IN PAYLOAD
                         "updated_at": current_timestamp,
                         "updated_by": current_user
                     }

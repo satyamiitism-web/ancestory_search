@@ -19,6 +19,8 @@ def render_add_member_form(collection):
         with c3:
             gender = st.selectbox("Gender", ["M", "F", "Other"])
 
+        association = st.selectbox("Association", ["son", "daughter", "son-in-law", "daughter-in-law"])
+
         # Row 2: Parents
         st.markdown("### Parents")
         p1, p2 = st.columns(2)
@@ -60,18 +62,16 @@ def render_add_member_form(collection):
         current_timestamp = datetime.now(timezone.utc)
         current_user = st.session_state.get("user_name").title()
 
-        print(f"session_state_data: {st.session_state}")
-
         new_doc = {
             "slug": slug,
             "name": name.strip(),
             "gender": gender,
             "spouse": spouse.strip(),
             "parents": parents,
-            "parents_in_law": parents_in_law, 
+            "parents_in_law": parents_in_law,
             "phone": phone.strip(),
             "work": work.strip(),
-            # --- NEW: Add Timestamps ---
+            "association": association.strip(),
             "created_at": current_timestamp,
             "updated_at": current_timestamp,
             "updated_by": current_user
