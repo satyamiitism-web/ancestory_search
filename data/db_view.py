@@ -18,7 +18,7 @@ def render_database_view(collection):
 
 
         # Drop '_id' and 'slug' columns if they exist
-        columns_to_drop = ['_id', 'slug', 'created_at', 'updated_at']
+        columns_to_drop = ['_id', 'created_at', 'updated_at']
         df = df.drop(columns=columns_to_drop, errors='ignore')
 
         # Add serial number column at the beginning

@@ -10,6 +10,7 @@ from data.edit_member import render_edit_member_form
 from data.view_details import render_search_interface
 from data.events import render_events_page, render_add_event_form
 from data.history_page import render_history_markdown
+from data.bulk_update import render_bulk_update_form
 from data.db_view import render_database_view
 from data.view_tree import render_tree_view
 from data.lineage_info import render_lineage_sidebar
@@ -77,7 +78,7 @@ elif selection == "admin":
 
         admin_tab = st.radio(
             "Manage Database:",
-            options=["Add New Member", "Edit Details", "Add Event", "View Full Data"],
+            options=["Add New Member", "Edit Details", "Add Event", "Bulk Update", "View Full Data"],
             horizontal=True,
             label_visibility="collapsed"
         )
@@ -96,3 +97,6 @@ elif selection == "admin":
 
         elif admin_tab == "Add Event":
             render_add_event_form()
+
+        elif admin_tab == "Bulk Update":
+            render_bulk_update_form()
