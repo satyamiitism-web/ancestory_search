@@ -4,3 +4,4 @@ pymongo
 python-dotenv
 pandas
 networkx
+streamlit_option_menu
