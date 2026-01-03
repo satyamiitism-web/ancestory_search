@@ -2,20 +2,22 @@ import streamlit as st
 
 st.set_page_config(page_title="बहलोलपुर वंशावली")
 
-from data.database import FAMILY_COLLECTION, USERS_COLLECTION, EVENTS_COLLECTION
 import pandas as pd
+from streamlit_option_menu import option_menu
 
 from data.add_member import render_add_member_form
-from data.edit_member import render_edit_member_form
-from data.view_details import render_search_interface
-from data.events import render_events_page, render_add_event_form
-from data.history_page import render_history_markdown
 from data.bulk_update import render_bulk_update_form
+from data.database import (EVENTS_COLLECTION, FAMILY_COLLECTION,
+                           USERS_COLLECTION)
 from data.db_view import render_database_view
-from data.view_tree import render_tree_view
+from data.edit_member import render_edit_member_form
+from data.events import render_add_event_form, render_events_page
+from data.history_page import render_history_markdown
 from data.lineage_info import render_lineage_sidebar
-from handlers.request_handlers import get_relatives
+from data.view_details import render_search_interface
+from data.view_tree import render_tree_view
 from handlers.auth_handlers import handle_login, handle_logout
+from handlers.request_handlers import get_relatives
 
 # 2. Initialize Session State
 if 'logged_in' not in st.session_state:
@@ -32,22 +34,62 @@ render_lineage_sidebar()
 
 st.title("🔍 बहलोलपुर वंशावली")
 
-# 3. Navigation
-selection = st.segmented_control(
-    "Mode",
-    options=["history", "search", "tree", "events", "admin"],
-    format_func=lambda x: {
-        "history": "ℹ️ history",
-        "search": "🔍 Search",
-        "tree": "🌳 Tree",
-        "events": "📅 Events",
-        "admin": "🔐 Admin Panel" if st.session_state['logged_in'] else "🔐 Admin"
-    }[x],
-    selection_mode="single",
-    default=st.session_state['nav_mode'],
-    key="nav_selection",
-    on_change=lambda: st.session_state.update(nav_mode=st.session_state.nav_selection)
+nav_config = {
+    "history": {"label": "History", "icon": "info-circle"},
+    "search": {"label": "Search", "icon": "search"},
+    "tree": {"label": "Tree", "icon": "diagram-3"},
+    "events": {"label": "Events", "icon": "calendar-event"},
+    "admin": {
+        "label": "Admin Panel" if st.session_state.get('logged_in') else "Admin", 
+        "icon": "lock"
+    },
+}
+
+options_list = [val["label"] for val in nav_config.values()]
+icons_list = [val["icon"] for val in nav_config.values()]
+keys_list = list(nav_config.keys())
+
+current_mode = st.session_state.get('nav_mode', 'search')
+try:
+    default_index = keys_list.index(current_mode)
+except ValueError:
+    default_index = 1
+
+selected_label = option_menu(
+    menu_title=None,
+    options=options_list,
+    icons=icons_list,
+    default_index=default_index,
+    orientation="horizontal",
+    styles={
+        # Remove hardcoded background so it fits dark mode
+        "container": {
+            "padding": "0!important", 
+            "background-color": "transparent"
+        },
+        # Icon color (orange works well on both, or remove to use default)
+        "icon": {
+            "color": "orange", 
+            "font-size": "18px"
+        }, 
+        # Text color: removing 'color' lets it adapt to the theme (white in dark mode, black in light)
+        "nav-link": {
+            "font-size": "16px", 
+            "text-align": "center", 
+            "margin": "0px", 
+            "--hover-color": "#262730",  # Slight dark grey for hover in dark mode
+        },
+        # Selected background: Streamlit's primary red looks good on both
+        "nav-link-selected": {
+            "background-color": "#ff4b4b"
+        },
+    }
 )
+selection = next(key for key, val in nav_config.items() if val["label"] == selected_label)
+
+if st.session_state.get('nav_mode') != selection:
+    st.session_state['nav_mode'] = selection
+    st.rerun()
 
 st.divider()
 

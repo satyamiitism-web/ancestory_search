@@ -1,7 +1,9 @@
-import streamlit as st
 import time
-from pymongo.errors import PyMongoError
 from datetime import datetime, timezone
+
+import streamlit as st
+from pymongo.errors import PyMongoError
+
 
 def render_edit_member_form(collection):
     """
@@ -204,7 +206,7 @@ def render_edit_member_form(collection):
 
                 # Relationship / Association
                 st.markdown("### Relationship & Work")
-                assoc_options = ["son", "daughter", "daughter-in-law", "son-in-law", "wife", "husband", "other"]
+                assoc_options = ["son", "daughter", "daughter-in-law", "son-in-law"]
                 curr_assoc = person.get('association', 'son')
                 
                 # Logic to handle custom associations not in list
