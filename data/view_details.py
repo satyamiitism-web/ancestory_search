@@ -1,5 +1,7 @@
 import streamlit as st
-from data.database import FAMILY_COLLECTION 
+
+from data.database import FAMILY_COLLECTION
+
 
 def render_search_interface(get_relatives_func):
     """
@@ -106,48 +108,111 @@ def render_search_interface(get_relatives_func):
 
 
 def _display_family_results(results):
-    """Internal helper to display the results nicely."""
+    """Internal helper to display the results with a clean Profile Score."""
     
     target = results['target']
     
-    # --- Data Extraction ---
-    # safely get phone/work, defaulting to dash if missing
-    phone = target.get('phone', '—')
-    work = target.get('work', '—')
-    gender = target.get('gender', 'N/A')
+    # --- 1. Calculate Score (Same logic as before) ---
+    def calculate_score(member_data):
+        score = 0
+        weights = {'basic_info': 20, 'parents': 30, 'spouse': 5, 
+                   'children': 5, 'contact': 20, 'work': 20}
 
-    # --- Header Section ---
-    st.divider()
-    st.subheader(f"👤 {target['name']}")
-    
-    # NEW: Metadata Row (Gender | Phone | Work)
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        gender_icon = "👨" if gender == "M" else "👩" 
-        st.caption(f"{gender_icon} **Gender:** {gender}")
-    with m2:
-        st.markdown(f"📞 **Phone:** {phone}")
-    with m3:
-        st.markdown(f"💼 **Work:** {work}")
-
-    # --- Relationship Data Preparation ---
-    def format_list(person_list):
-        if not person_list:
-            return "—"
-        return ", ".join([f"**{p['name']}**" for p in person_list])
-
-    spouse_val = f"**{results['spouse']['name']}**" if results['spouse'] else "—"
-    children_val = format_list(results['children'])
-    parents_val = format_list(results['parents'])
-    grandparents_val = format_list(results['grandparents'])
-
-    # --- Visual Cards Layout ---
-    c1, c2 = st.columns(2)
-    
-    with c1:
-        st.info(f"❤️ **Spouse**\n\n{spouse_val}")
-        st.warning(f"👪 **Parents**\n\n{parents_val}")
+        if member_data.get('name') and member_data.get('gender'): score += weights['basic_info']
+        if results.get('parents'): score += weights['parents']
+        if results.get('spouse'): score += weights['spouse']
+        if results.get('children'): score += weights['children']
         
-    with c2:
-        st.success(f"👶 **Children**\n\n{children_val}")
-        st.error(f"👴👵 **Grandparents**\n\n{grandparents_val}")
+        raw_phone = str(member_data.get('phone', '')).strip()
+        if raw_phone and raw_phone not in ['-', '—', 'N/A', 'None']: score += weights['contact']
+            
+        raw_work = str(member_data.get('work', '')).strip()
+        if raw_work and raw_work not in ['-', '—', 'N/A', 'None']: score += weights['work']
+
+        return min(score, 100) # Cap at 100
+
+    profile_score = calculate_score(target)
+
+    # --- 2. Determine Status ---
+    if profile_score >= 80:
+        delta_color = "normal" # Green in Streamlit metric
+        status_label = "🌟 Excellent"
+    elif profile_score >= 50:
+        delta_color = "off"   # Gray/Neutral
+        status_label = "⚠️ Good"
+    else:
+        delta_color = "inverse" # Red
+        status_label = "🔴 Incomplete"
+
+    # --- 3. CLEAN HEADER LAYOUT ---
+    st.divider()
+    
+    # Create a 2-column layout: Left for Name/Bio, Right for Score Card
+    col_main, col_score = st.columns([0.8, 0.2])
+    
+    with col_main:
+        # Big Name Header
+        st.markdown(f"## 👤 {target['name']}")
+
+        gender_txt = "Male" if target.get('gender') == "M" else "Female"
+        gender_icon = "👨" if gender_txt == "M" else "👩"
+        phone = target.get('phone', 'Not Available')
+        work = target.get('work', 'Not Available')
+
+        badge_style = """
+        display: inline-flex;
+        align-items: center;
+        background-color: rgba(128, 128, 128, 0.15); 
+        padding: 4px 12px;
+        border-radius: 20px;
+        margin-right: 10px;
+        font-size: 0.9em;
+        """
+        
+        # Render clean HTML badges
+        st.markdown(
+            f"""
+            <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px;">
+                <span style="{badge_style}">
+                    <span style="margin-right: 6px;">{gender_icon}</span> {gender_txt}
+                </span>
+                <span style="{badge_style}">
+                    <span style="margin-right: 6px;">📞</span> {phone}
+                </span>
+                <span style="{badge_style}">
+                    <span style="margin-right: 6px;">💼</span> {work}
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with col_score:
+        # Use st.metric for a clean, professional stat look
+        st.metric(
+            label="Profile Strength", 
+            value=f"{profile_score}%", 
+            delta=status_label,
+            delta_color=delta_color
+        )
+
+    # --- 4. Relationship Cards (Standardized Grid) ---
+    def format_list(person_list):
+        if not person_list: return "—"
+        return ", ".join([p['name'] for p in person_list]) # Removed bolding for cleaner look inside colored boxes
+
+    spouse_val = results['spouse']['name'] if results['spouse'] else "—"
+    
+    # Row 1
+    r1c1, r1c2 = st.columns(2)
+    with r1c1:
+        st.info(f"**❤️ Spouse**\n\n{spouse_val}")
+    with r1c2:
+        st.success(f"**👶 Children**\n\n{format_list(results['children'])}")
+        
+    # Row 2
+    r2c1, r2c2 = st.columns(2)
+    with r2c1:
+        st.warning(f"**👪 Parents**\n\n{format_list(results['parents'])}")
+    with r2c2:
+        st.error(f"**👴👵 Grandparents**\n\n{format_list(results['grandparents'])}")
