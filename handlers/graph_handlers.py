@@ -1,9 +1,9 @@
 import graphviz
-import streamlit as st
 import networkx as nx
+import streamlit as st
 
 
-def get_focused_subgraph(full_data, center_person_name):
+async def get_focused_subgraph(full_data, center_person_name):
     G = nx.DiGraph()
     name_map = {p['name'].lower(): p['name'] for p in full_data if 'name' in p}
     center_name_key = center_person_name.lower().strip()
@@ -46,8 +46,8 @@ def get_focused_subgraph(full_data, center_person_name):
         return None, str(e)
 
 
-def render_focused_tree(data, center_name):
-    result = get_focused_subgraph(data, center_name)
+async def render_focused_tree(data, center_name):
+    result = await get_focused_subgraph(data, center_name)
     if not result or len(result) != 5:
         return None
         
@@ -59,12 +59,12 @@ def render_focused_tree(data, center_name):
     dot.attr('node', shape='plain', fontname='Sans-Serif') 
 
     # --- HELPER: GET GENDER ---
-    def get_gender(name):
+    async def get_gender(name):
         p = person_map.get(name.lower().strip(), {})
         return p.get('gender', 'M') 
 
     # --- HELPER: GET STYLE (Color & Tooltip) ---
-    def get_node_style(name):
+    async def get_node_style(name):
         person = person_map.get(name.lower().strip(), {})
         assoc = person.get('association', '')
         
@@ -92,8 +92,8 @@ def render_focused_tree(data, center_name):
             pair_key = tuple(sorted((p1, p2)))
             
             if pair_key not in processed_pairs:
-                g1 = get_gender(p1)
-                g2 = get_gender(p2)
+                g1 = await get_gender(p1)
+                g2 = await get_gender(p2)
                 
                 # Logic: Husband on Top
                 top_p, bottom_p = pair_key[0], pair_key[1]
@@ -103,8 +103,8 @@ def render_focused_tree(data, center_name):
                     top_p, bottom_p = p2, p1
                 
                 # Get Styles for each person in the couple
-                bg_top, tip_top = get_node_style(top_p)
-                bg_btm, tip_btm = get_node_style(bottom_p)
+                bg_top, tip_top = await get_node_style(top_p)
+                bg_btm, tip_btm = await get_node_style(bottom_p)
 
                 # HTML Table Label with ALIGN="CENTER" and TOOLTIP
                 label = f"""<
@@ -125,7 +125,7 @@ def render_focused_tree(data, center_name):
     # B. SINGLES
     for node in relevant_nodes:
         if node not in added_nodes:
-            bg_color, tooltip = get_node_style(node)
+            bg_color, tooltip = await get_node_style(node)
             
             label = f"""<
             <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" ROUNDED="TRUE">
@@ -145,7 +145,8 @@ def render_focused_tree(data, center_name):
         parents = list(G.predecessors(child))
         if not parents: continue
         
-        father = next((p for p in parents if get_gender(p) == 'M'), parents[0])
+        males = [p for p in parents if await get_gender(p) == 'M']
+        father = males[0] if males else parents[0]
         
         u = node_id_map.get(father)
         v = node_id_map.get(child)

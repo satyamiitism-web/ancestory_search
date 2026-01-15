@@ -1,11 +1,11 @@
-from datetime import datetime
-import streamlit as st
-from data.database import EVENTS_COLLECTION
-
-import streamlit as st
 from datetime import datetime, time
 
-def render_add_event_form():
+import streamlit as st
+
+from data.database import EVENTS_COLLECTION
+
+
+async def render_add_event_form():
     """
     Renders a form to add new events to the MongoDB 'events' collection.
     """
@@ -59,7 +59,7 @@ def render_add_event_form():
                     st.error(f"❌ Error adding event: {e}")
 
 
-def render_events_page(events_collection):
+async def render_events_page(events_collection):
     """Renders a full-page timeline view of upcoming events."""
     
     st.header("📅 Upcoming Events")

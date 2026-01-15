@@ -1,6 +1,7 @@
 from data.database import FAMILY_COLLECTION
 
-def get_relatives(slug):
+
+async def get_relatives(slug):
     """
     Fetches relatives for a person based on their unique SLUG.
     
@@ -27,28 +28,30 @@ def get_relatives(slug):
 
     # --- Helper: Name-based Lookup ---
     # Used for looking up parents/spouses referenced by name string
-    def get_by_name(name_str):
+    async def get_by_name(name_str):
         if not name_str: return None
         # Note: If multiple people have the same name, this picks the first one.
         # This is a limitation of name-based linking.
         return FAMILY_COLLECTION.find_one({"name": name_str})
 
-    # 2. Parents
+        # 2. Parents
     parents = []
     raw_parents = person.get("parents", [])
     for p_name in raw_parents:
-        p_doc = get_by_name(p_name)
+        p_doc = await get_by_name(p_name)
         if p_doc:
             parents.append(p_doc)
 
-    # 3. Grandparents
+    # 3. Grandparents (PATERNAL ONLY)
     grandparents = []
     for parent in parents:
-        gp_names = parent.get("parents", [])
-        for gp_name in gp_names:
-            gp_doc = get_by_name(gp_name)
-            if gp_doc:
-                grandparents.append(gp_doc)
+        # LOGIC CHANGE: Only fetch parents if this parent is Male (Father)
+        if parent.get("gender") == "M":
+            gp_names = parent.get("parents", [])
+            for gp_name in gp_names:
+                gp_doc = await get_by_name(gp_name)
+                if gp_doc:
+                    grandparents.append(gp_doc)
 
     # 4. Children
     # Find all docs where 'parents' array contains the target's NAME
@@ -110,7 +113,7 @@ def get_relatives(slug):
 
     # 6. Spouse
     spouse_name = person.get("spouse", "")
-    spouse = get_by_name(spouse_name) if spouse_name else None
+    spouse = await get_by_name(spouse_name) if spouse_name else None
 
     # 7. Parents-in-Law
     parents_in_law = []
@@ -121,7 +124,7 @@ def get_relatives(slug):
         raw_in_laws = spouse.get("parents", [])
 
     for pl_name in raw_in_laws:
-        pl_doc = get_by_name(pl_name)
+        pl_doc = await get_by_name(pl_name)
         if pl_doc:
             parents_in_law.append(pl_doc)
         else:
@@ -133,7 +136,7 @@ def get_relatives(slug):
     for child in children:
         c_spouse_name = child.get("spouse")
         if c_spouse_name:
-            c_spouse = get_by_name(c_spouse_name)
+            c_spouse = await get_by_name(c_spouse_name)
             if c_spouse:
                 c_spouse['spouse_of'] = child['name']
                 children_in_law.append(c_spouse)

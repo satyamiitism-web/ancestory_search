@@ -1,10 +1,12 @@
-import streamlit as st
 import random
 import time
-from pymongo.errors import DuplicateKeyError
 from datetime import datetime, timezone
 
-def render_add_member_form(collection):
+import streamlit as st
+from pymongo.errors import DuplicateKeyError
+
+
+async def render_add_member_form(collection):
     """
     Renders the form to add a new family member.
     Handles duplicate names by creating unique IDs using an incremental counter logic.

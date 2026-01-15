@@ -1,7 +1,9 @@
 import streamlit as st
+
 from handlers.graph_handlers import render_focused_tree
 
-def render_tree_view(collection, _): 
+
+async def render_tree_view(collection, _): 
     st.header("🌳 View Family Tree")
 
     # --- 1. Fetch Data & Build Labels (Same logic as Search Tab) ---
@@ -21,14 +23,14 @@ def render_tree_view(collection, _):
         name = m.get('name', 'Unknown')
         assoc = str(m.get('association', '')).lower().strip()
         
-        def get_first(field):
+        async def get_first(field):
             val = m.get(field)
             if isinstance(val, list) and val: return val[0]
             if isinstance(val, str): return val
             return None
 
-        spouse_name = get_first('spouse')
-        father_name = get_first('parents')
+        spouse_name = await get_first('spouse')
+        father_name = await get_first('parents')
         
         relation_suffix = ""
 
@@ -81,7 +83,7 @@ def render_tree_view(collection, _):
             # If render_focused_tree needs ALL fields, fetch full collection again:
             full_data_for_graph = list(collection.find({}, {"_id": 0}))
             
-            graph = render_focused_tree(full_data_for_graph, real_name)
+            graph = await render_focused_tree(full_data_for_graph, real_name)
             
             if graph:
                 st.graphviz_chart(graph, use_container_width=True)

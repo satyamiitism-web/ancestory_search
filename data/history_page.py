@@ -1,6 +1,7 @@
 import streamlit as st
 
-def render_history_markdown():
+
+async def render_history_markdown():
     st.header("📜 हमारा इतिहास")
     st.markdown("---")
 

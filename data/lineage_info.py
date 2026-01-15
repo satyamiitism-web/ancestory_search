@@ -1,6 +1,7 @@
 import streamlit as st
 
-def render_lineage_sidebar():
+
+async def render_lineage_sidebar():
     with st.sidebar.expander("📜 वंश परिचय", expanded=True):
         st.markdown("""
         **📍 स्थान:** उत्तर प्रदेश (सीतापुर से 36 किमी)

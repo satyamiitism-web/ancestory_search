@@ -1,9 +1,12 @@
-import streamlit as st
-import pandas as pd
 from datetime import datetime
-from .database import FAMILY_COLLECTION # Adjusted import for standard file structure
 
-def render_bulk_update_form():
+import pandas as pd
+import streamlit as st
+
+from .database import FAMILY_COLLECTION
+
+
+async def render_bulk_update_form():
     """
     Renders a file uploader and processes the CSV to update ANY specific field
     for family members using their Slug as the identifier.
@@ -53,13 +56,13 @@ def render_bulk_update_form():
                 if not target_field:
                     st.error("⚠️ Please specify the Target Database Field Name.")
                 else:
-                    _process_update_logic(df, slug_col, val_col, target_field)
+                    await _process_update_logic(df, slug_col, val_col, target_field)
 
         except Exception as e:
             st.error(f"❌ Could not read CSV: {e}")
 
 
-def _process_update_logic(df, slug_col_header, val_col_header, target_field_name):
+async def _process_update_logic(df, slug_col_header, val_col_header, target_field_name):
     """
     Iterates through the DataFrame and updates the specified dynamic field in MongoDB.
     

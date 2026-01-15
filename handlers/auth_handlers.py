@@ -1,7 +1,9 @@
-import streamlit as st
 import time
 
-def handle_login(users_collection):
+import streamlit as st
+
+
+async def handle_login(users_collection):
     """
     Renders the login form and handles authentication logic.
     Returns:
@@ -45,7 +47,7 @@ def handle_login(users_collection):
                     return False
     return False
 
-def handle_logout():
+async def handle_logout():
     """
     Clears session state and logs the user out.
     """

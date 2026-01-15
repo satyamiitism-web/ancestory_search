@@ -1,10 +1,10 @@
 from datetime import datetime
-from database import FAMILY_COLLECTION
+
 import pandas as pd
+from database import FAMILY_COLLECTION
 
 
-
-def run_update_script(csv_file_path):
+async def run_update_script(csv_file_path):
 
     print(f"📂 Reading CSV file: {csv_file_path}...")
     try:

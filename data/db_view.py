@@ -1,8 +1,8 @@
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 
-def render_database_view(collection):
+async def render_database_view(collection):
     """
     Fetches all documents from the collection, cleans specific columns, 
     and displays them in a Streamlit dataframe.
